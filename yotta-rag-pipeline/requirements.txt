@@ -1,0 +1,26 @@
+# Yotta Workstream A - RAG Pipeline Requirements
+# Python 3.12 compatible
+
+# Core Frameworks & UI
+streamlit>=1.30.0
+pydantic>=2.5.0
+python-dotenv>=1.0.0
+requests>=2.31.0
+
+# LLM Providers & API Clients
+openai>=1.10.0
+
+# Embeddings & Vector Search (Local fallback & in-memory)
+sentence-transformers>=2.2.2
+torch>=2.0.0
+numpy>=1.24.0
+
+# Lexical Retrieval
+rank-bm25>=0.2.2
+
+# Dataset & Data Manipulation
+datasets>=2.14.0
+pandas>=2.0.0
+
+# Testing & Quality
+pytest>=7.4.0
