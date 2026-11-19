@@ -87,6 +87,52 @@ def test_msmarco_fallback_on_error(monkeypatch):
     assert all(p.doc_id.startswith("doc_") for p in passages)
 
 
+def test_msmarco_correct_repository_id_and_mock(monkeypatch):
+    """
+    Verify that load_msmarco_subset calls datasets.load_dataset with the exact
+    repository ID 'microsoft/ms_marco' and configuration 'v1.1', returning records
+    with source 'hf_msmarco_v1.1' (not 'local_fallback').
+    """
+    captured_calls = []
+
+    def mock_load_dataset(*args, **kwargs):
+        captured_calls.append({"args": args, "kwargs": kwargs})
+        # Simulate MS MARCO v1.1 structure
+        return [
+            {
+                "query_id": "9999",
+                "query_type": "description",
+                "passages": {
+                    "passage_text": [
+                        "This is a verified test passage extracted from microsoft/ms_marco v1.1 dataset."
+                    ],
+                    "is_selected": [1],
+                },
+            }
+        ]
+
+    import datasets
+    monkeypatch.setattr(datasets, "load_dataset", mock_load_dataset)
+
+    passages = load_msmarco_subset(sample_size=1, fallback_on_error=False)
+
+    # 1. Verify load_dataset call arguments
+    assert len(captured_calls) == 1
+    call = captured_calls[0]
+    repo_id = call["args"][0] if call["args"] else call["kwargs"].get("path")
+    config_name = call["args"][1] if len(call["args"]) > 1 else call["kwargs"].get("name")
+    assert repo_id == "microsoft/ms_marco"
+    assert config_name == "v1.1"
+
+    # 2. Verify returned passages metadata and source
+    assert len(passages) == 1
+    p = passages[0]
+    assert p.metadata["source"] == "hf_msmarco_v1.1"
+    assert p.metadata["source"] != "local_fallback"
+    assert p.doc_id == "msmarco_9999_0"
+    assert "verified test passage" in p.text
+
+
 def test_eval_queries_file():
     """Verify evaluation queries JSON file exists, is valid, and matches corpus IDs."""
     data_dir = Path(__file__).resolve().parent.parent / "data"

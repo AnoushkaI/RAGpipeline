@@ -24,5 +24,3 @@ pandas>=2.0.0
 
 # Testing & Quality
 pytest>=7.4.0
-
-datasets>=5.2.0

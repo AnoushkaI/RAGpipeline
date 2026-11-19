@@ -207,7 +207,7 @@ def load_msmarco_subset(
     Loads a reproducible small subset of MS MARCO from Hugging Face Datasets.
     
     Dataset Details:
-        Dataset ID: 'ms_marco'
+        Dataset ID: 'microsoft/ms_marco'
         Config: 'v1.1'
         Split: 'train' (or user specified)
     
@@ -236,7 +236,7 @@ def load_msmarco_subset(
 
         # Load small slice deterministically via sequential first-N slice
         dataset = load_dataset(
-            "ms_marco",
+            "microsoft/ms_marco",
             "v1.1",
             split=f"{split}[:{sample_size * 2}]",  # load 2x to account for cleaning/dedup
             trust_remote_code=False,

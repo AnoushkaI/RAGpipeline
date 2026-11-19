@@ -792,16 +792,22 @@ class SentenceTransformerEmbeddingProvider(BaseEmbeddingProvider):
     def _get_model(self):
         if self._model_instance is None:
             try:
+                import os
                 import sys
                 print(f"  [i] Initializing local SentenceTransformer '{self.config.model}'...", flush=True)
-                from sentence_transformers import SentenceTransformer
                 
                 # Check for cached snapshot first for instantaneous offline resolution
                 cached_path = self._resolve_local_cache_path(self.config.model)
                 if cached_path:
-                    self._model_instance = SentenceTransformer(cached_path)
+                    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+                    os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+                
+                from sentence_transformers import SentenceTransformer
+                
+                if cached_path:
+                    self._model_instance = SentenceTransformer(cached_path, device="cpu")
                 else:
-                    self._model_instance = SentenceTransformer(self.config.model)
+                    self._model_instance = SentenceTransformer(self.config.model, device="cpu")
             except Exception as e:
                 raise ProviderExecutionError(
                     f"Failed to load SentenceTransformer model '{self.config.model}': {e}"

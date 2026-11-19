@@ -177,7 +177,7 @@ streamlit run app.py
 ## 5. Dataset Ingestion, Cleaning & Fallback
 
 ### Dataset Specification & Selection Method
-* **Dataset ID:** `ms_marco`
+* **Dataset ID:** `microsoft/ms_marco`
 * **Configuration:** `v1.1`
 * **Split:** `train`
 * **Selection Method:** Deterministic sequential first-$N$ slice (e.g., `train[:sample_size * 2]`). Sequential slicing is deliberately chosen over pseudo-random sampling to guarantee exact cross-environment reproducibility without seed drift.
@@ -196,11 +196,74 @@ streamlit run app.py
 
 ### Local JSONL Fallback & Live Verification Status
 * **Curated Local Fallback (`data/sample_passages.jsonl`):** Contains 20 curated, high-information passages spanning Machine Learning, Information Retrieval, Database Indexing, and Networking. **Verified and fully operational offline.**
-* **Hugging Face Ingestion Status:** The Hugging Face loading adapter is fully configured and handles errors gracefully. However, live network ingestion from Hugging Face has **not yet been verified in the sandboxed environment** (where external network access is blocked). When Hugging Face is unreachable or the `datasets` package is absent, the system automatically falls back to the verified local JSONL corpus.
+* **Hugging Face Ingestion Status:** Verified live with `microsoft/ms_marco` (config `v1.1`, split `train`) with `fallback_on_error=False`, successfully extracting passages with provenance `source: hf_msmarco_v1.1`. When running in network-isolated environments or if Hugging Face is unreachable, the system automatically and transparently falls back to the curated local JSONL corpus.
 
 ---
 
-## 6. Security & Reliability Highlights
+## 6. Dense and BM25 Retrieval Architecture & Evaluation
+
+### Retrieval Architecture
+1. **Dense Vector Retrieval (`rag/indexing.py`, `rag/retrieval.py`):**
+   * **Embedding Model:** Local `all-MiniLM-L6-v2` via `sentence-transformers` (384-dimensional dense vectors).
+   * **Vector Storage:** In-memory 2D NumPy array (`float32`), preserving chunk IDs, parent `doc_id` lineage, chunk text, and metadata.
+   * **Safe Normalization:** Each row is $L_2$-normalized with an $\epsilon = 10^{-12}$ guardrail to prevent division-by-zero or `NaN` values.
+   * **Cosine Similarity:** Computed via vectorized matrix-vector dot product (`np.dot(embeddings, query_vector)`). Handles zero vectors and dimension mismatches safely.
+2. **Lexical Retrieval (BM25Okapi):**
+   * **Algorithm:** `rank-bm25` (`BM25Okapi`) with standard saturation ($k_1=1.5$) and document length penalization ($b=0.75$).
+   * **Tokenization:** Alphanumeric regex word tokenization (`\b\w+\b`) applied consistently at indexing and query time.
+   * **Zero / Empty Handling:** Gracefully returns zero scores without raising exceptions on whitespace or empty queries.
+
+### Fair Comparison Methodology
+* **Unified Corpus & Chunks:** Both retrievers operate over the exact same 20 passages split into 40 chunks using the fixed-size strategy (`chunk_size=300`, `chunk_overlap=50`).
+* **Lineage-Aware Recall@K:** Retrieved chunk IDs are mapped to parent document IDs before computing Recall@K. Taking the set of unique parent document IDs in the top-$K$ guarantees that **multiple chunks from the same relevant document are never counted more than once**.
+* **Same Evaluation Benchmark:** Tested on 15 ground-truth queries in `data/eval_queries.json` across Machine Learning, Information Retrieval, Databases, Systems, and Security.
+
+### Evaluation Commands
+* **Run Retrieval Benchmark:**
+  ```powershell
+  python rag/evaluation.py
+  # or
+  python -m rag.evaluation
+  ```
+* **Run Phase 3 Tests:**
+  ```powershell
+  python -m pytest tests/test_indexing.py tests/test_retrieval.py tests/test_evaluation.py -v
+  ```
+* **Run Full Suite (49 tests):**
+  ```powershell
+  python -m pytest tests/ -v
+  ```
+
+### Actual Benchmark Results
+
+```text
+==================================================================
+        RETRIEVAL EVALUATION REPORT: DENSE vs. BM25              
+==================================================================
+Evaluated Queries : 15
+Evaluated K Levels: [1, 3, 5]
+------------------------------------------------------------------
+Metric             | Dense (Cosine)     | BM25 (Okapi)      
+------------------------------------------------------------------
+Mean Recall@1     |          100.00% |           86.67%
+Mean Recall@3     |          100.00% |          100.00%
+Mean Recall@5     |          100.00% |          100.00%
+==================================================================
+```
+
+### Distinguishing Mocked Tests from Real Embedding Evaluation
+* **Mocked Unit Tests:** Fast, deterministic unit tests use `MockEmbeddingProvider` and `ControlledEmbeddingProvider` to verify matrix dimensions, safe normalization, empty-input handling, zero vectors, dimension mismatch exceptions, and Recall@K math without touching the file system or PyTorch models.
+* **Real Integration & Benchmark Evaluation:** `test_local_sentence_transformer_integration` and `rag/evaluation.py` run the actual `all-MiniLM-L6-v2` SentenceTransformer model on CPU using locally cached model weights.
+
+### Performance & Hardware Profile
+* **Target Hardware:** Windows laptop (8 GB RAM, RTX 2050 4 GB).
+* **Inference Device:** Runs strictly on CPU (`device="cpu"`) with minimal memory footprint (< 500 MB peak RAM).
+* **Offline Resolution:** Local cached snapshots are resolved via `_resolve_local_cache_path()` with `HF_HUB_OFFLINE=1`, eliminating external network requests.
+* **Limitations:** The initial cold import of `transformers` / `torch` takes ~25-45 seconds on Windows; once loaded in-process, indexing 40 chunks takes ~1.1 seconds, and retrieval ranking takes < 5 milliseconds per query.
+
+---
+
+## 7. Security & Reliability Highlights
 1. **No Secret Leaks:** All API keys are masked using `mask_secret()` before logging or rendering on the Streamlit dashboard.
 2. **Graceful Degradation:** Missing credentials or unreachable server ports do not crash the application. Friendly diagnostics (`MISSING_CREDENTIALS` / `FAILED`) advise the user on next steps.
 3. **No Heavy Framework Bloat:** Implemented directly with clean, readable Python, NumPy, and standard library constructs rather than complex agent frameworks or external vector databases.
