@@ -190,24 +190,104 @@ class BM25Retriever:
 
 
 # ------------------------------------------------------------------------------
+# Hybrid Retriever (Reciprocal Rank Fusion - RRF)
+# ------------------------------------------------------------------------------
+
+class HybridRetriever:
+    """
+    Performs hybrid retrieval combining dense vector similarity and BM25 lexical ranking
+    via Reciprocal Rank Fusion (RRF).
+    """
+
+    def __init__(
+        self,
+        dense_index: DenseIndex,
+        bm25_index: BM25Index,
+        embedding_provider: BaseEmbeddingProvider,
+        rrf_k: int = 60,
+    ):
+        self.dense_retriever = DenseRetriever(index=dense_index, embedding_provider=embedding_provider)
+        self.bm25_retriever = BM25Retriever(index=bm25_index)
+        self.rrf_k = rrf_k
+
+    def retrieve(self, query: str, top_k: int = 3) -> list[RetrievalResult]:
+        """
+        Retrieves top-k chunks by fusing rankings from dense and BM25 retrievers.
+        Score formula: RRF(d) = sum(1.0 / (rrf_k + rank_m(d))) for m in {dense, bm25}.
+        """
+        if top_k <= 0:
+            return []
+
+        candidate_k = max(top_k * 2, 10)
+        dense_results = self.dense_retriever.retrieve(query, top_k=candidate_k)
+        bm25_results = self.bm25_retriever.retrieve(query, top_k=candidate_k)
+
+        rrf_scores: dict[str, float] = {}
+        chunk_map: dict[str, RetrievalResult] = {}
+
+        for rank, res in enumerate(dense_results, start=1):
+            chunk_map[res.chunk_id] = res
+            rrf_scores[res.chunk_id] = rrf_scores.get(res.chunk_id, 0.0) + (1.0 / (self.rrf_k + rank))
+
+        for rank, res in enumerate(bm25_results, start=1):
+            chunk_map[res.chunk_id] = res
+            rrf_scores[res.chunk_id] = rrf_scores.get(res.chunk_id, 0.0) + (1.0 / (self.rrf_k + rank))
+
+        sorted_chunk_ids = sorted(rrf_scores.keys(), key=lambda cid: rrf_scores[cid], reverse=True)[:top_k]
+
+        dense_map = {r.chunk_id: r for r in dense_results}
+        bm25_map = {r.chunk_id: r for r in bm25_results}
+        max_possible_rrf = 2.0 / (self.rrf_k + 1)
+
+        results: list[RetrievalResult] = []
+        for cid in sorted_chunk_ids:
+            orig = chunk_map[cid]
+            d_res = dense_map.get(cid)
+            b_res = bm25_map.get(cid)
+            d_score = float(d_res.score) if d_res is not None else 0.0
+            b_score = float(b_res.score) if b_res is not None else 0.0
+
+            meta = dict(orig.metadata)
+            meta["dense_score"] = d_score
+            meta["bm25_score"] = b_score
+            meta["rrf_rank_score"] = float(rrf_scores[cid])
+
+            norm_score = min(1.0, float(rrf_scores[cid] / max_possible_rrf))
+            results.append(
+                RetrievalResult(
+                    chunk_id=orig.chunk_id,
+                    doc_id=orig.doc_id,
+                    text=orig.text,
+                    score=norm_score,
+                    metadata=meta,
+                    strategy="hybrid",
+                )
+            )
+
+        return results
+
+
+# ------------------------------------------------------------------------------
 # Unified Top-K Retrieval Entrypoint
 # ------------------------------------------------------------------------------
 
 def retrieve_top_k(
     query: str,
-    index: DenseIndex | BM25Index,
-    strategy: Literal["dense", "bm25"] = "dense",
+    index: DenseIndex | BM25Index | tuple[DenseIndex, BM25Index],
+    strategy: Literal["dense", "bm25", "hybrid"] = "dense",
     embedding_provider: Optional[BaseEmbeddingProvider] = None,
+    bm25_index: Optional[BM25Index] = None,
     top_k: int = 3,
 ) -> list[RetrievalResult]:
     """
-    Unified entrypoint to retrieve top-k chunks from either DenseIndex or BM25Index.
+    Unified entrypoint to retrieve top-k chunks from DenseIndex, BM25Index, or Hybrid.
     
     Args:
         query: User search string.
-        index: Target index (DenseIndex or BM25Index).
-        strategy: 'dense' or 'bm25'.
-        embedding_provider: Required if strategy is 'dense'.
+        index: Target index (DenseIndex, BM25Index, or tuple of (DenseIndex, BM25Index)).
+        strategy: 'dense', 'bm25', or 'hybrid'.
+        embedding_provider: Required if strategy is 'dense' or 'hybrid'.
+        bm25_index: Optional BM25Index when strategy is 'hybrid' and index is DenseIndex.
         top_k: Number of top results to return.
         
     Returns:
@@ -226,5 +306,16 @@ def retrieve_top_k(
             raise TypeError(f"Expected BM25Index for bm25 strategy, got {type(index)}")
         retriever = BM25Retriever(index=index)
         return retriever.retrieve(query=query, top_k=top_k)
+    elif strat == "hybrid":
+        if embedding_provider is None:
+            raise ValueError("embedding_provider must be supplied for hybrid retrieval.")
+        if isinstance(index, tuple) and len(index) == 2:
+            d_idx, b_idx = index
+        elif isinstance(index, DenseIndex) and bm25_index is not None:
+            d_idx, b_idx = index, bm25_index
+        else:
+            raise ValueError("Hybrid retrieval requires both DenseIndex and BM25Index.")
+        retriever = HybridRetriever(dense_index=d_idx, bm25_index=b_idx, embedding_provider=embedding_provider)
+        return retriever.retrieve(query=query, top_k=top_k)
     else:
-        raise ValueError(f"Unknown retrieval strategy '{strategy}'. Choose 'dense' or 'bm25'.")
+        raise ValueError(f"Unknown retrieval strategy '{strategy}'. Choose 'dense', 'bm25', or 'hybrid'.")
