@@ -65,12 +65,21 @@ def test_calculate_recall_at_k_edge_cases():
 
 def test_load_eval_queries():
     queries = load_eval_queries()
-    assert len(queries) >= 15
-    for q in queries:
+    assert len(queries) >= 18
+    supported = [q for q in queries if q.get("is_supported", True) and q.get("category") != "unsupported"]
+    assert len(supported) >= 15
+    for q in supported:
         assert "query_id" in q
         assert "query" in q
         assert "relevant_doc_ids" in q
         assert len(q["relevant_doc_ids"]) > 0
+
+    unsupported = [q for q in queries if not q.get("is_supported", True) or q.get("category") == "unsupported"]
+    assert len(unsupported) == 3
+    for q in unsupported:
+        assert "query_id" in q
+        assert "query" in q
+        assert len(q["relevant_doc_ids"]) == 0
 
 
 def test_evaluate_retrievers_mock_benchmark():

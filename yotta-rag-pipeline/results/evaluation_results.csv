@@ -14,3 +14,6 @@ q_012,How do quantum qubits differ from classical computer bits?,quantum,doc_012
 q_013,How is k-fold cross-validation performed to evaluate model accuracy?,machine_learning,doc_013,1.0,1.0,1.0,1.0,1.0,1.0
 q_014,What is the goal of relational database normalization?,databases,doc_014,1.0,1.0,1.0,1.0,1.0,1.0
 q_015,How does Docker containerization provide lightweight isolation compared to virtual machines?,devops,doc_015,1.0,1.0,1.0,1.0,1.0,1.0
+q_016,What is the current market share of Yotta in the Indian cloud computing market?,unsupported,,0.0,0.0,0.0,0.0,0.0,0.0
+q_017,What are the primary symptoms and diagnostic biomarkers of Parkinson's disease?,unsupported,,0.0,0.0,0.0,0.0,0.0,0.0
+q_018,Who won the FIFA World Cup final in 2022 and what was the final score?,unsupported,,0.0,0.0,0.0,0.0,0.0,0.0

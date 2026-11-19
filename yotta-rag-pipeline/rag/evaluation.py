@@ -153,11 +153,12 @@ class EvaluationReport:
         import pandas as pd
         rows = []
         for q in self.query_records:
+            gt_docs = ", ".join(q.relevant_doc_ids) if q.relevant_doc_ids else "None (Negative / Error Test)"
             row = {
                 "Query ID": q.query_id,
                 "Query": q.query,
                 "Category": q.category,
-                "Ground Truth Docs": ", ".join(q.relevant_doc_ids),
+                "Ground Truth Docs": gt_docs,
             }
             for k in self.k_values:
                 row[f"Dense Recall@{k}"] = round(q.dense_recall_at_k.get(k, 0.0), 4)
@@ -298,8 +299,11 @@ def evaluate_retrievers(
             )
         )
 
-    dense_mean = {k: dense_recall_sums[k] / float(num_queries) for k in k_values}
-    bm25_mean = {k: bm25_recall_sums[k] / float(num_queries) for k in k_values}
+    evaluable_queries = [q for q in queries if len(q.get("relevant_doc_ids", [])) > 0]
+    num_eval = len(evaluable_queries) if evaluable_queries else num_queries
+
+    dense_mean = {k: dense_recall_sums[k] / float(num_eval) for k in k_values}
+    bm25_mean = {k: bm25_recall_sums[k] / float(num_eval) for k in k_values}
 
     return EvaluationReport(
         num_queries=num_queries,

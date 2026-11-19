@@ -134,7 +134,7 @@ def test_msmarco_correct_repository_id_and_mock(monkeypatch):
 
 
 def test_eval_queries_file():
-    """Verify evaluation queries JSON file exists, is valid, and matches corpus IDs."""
+    """Verify evaluation queries JSON file exists, is valid, and covers both supported and negative test queries."""
     data_dir = Path(__file__).resolve().parent.parent / "data"
     eval_file = data_dir / "eval_queries.json"
     assert eval_file.exists()
@@ -142,15 +142,23 @@ def test_eval_queries_file():
     with open(eval_file, "r", encoding="utf-8") as f:
         queries = json.load(f)
 
-    assert len(queries) >= 10
+    assert len(queries) >= 15
     passages = load_local_fallback()
     corpus_ids = {p.doc_id for p in passages}
 
-    for item in queries:
+    supported_queries = [q for q in queries if q.get("is_supported", True) and q.get("category") != "unsupported"]
+    assert len(supported_queries) >= 15
+    for item in supported_queries:
         assert "query_id" in item
         assert "query" in item
         assert "relevant_doc_ids" in item
         assert len(item["relevant_doc_ids"]) > 0
-        # Check that ground-truth relevant IDs exist in the fallback corpus
         for doc_id in item["relevant_doc_ids"]:
             assert doc_id in corpus_ids, f"Relevant ID '{doc_id}' for query '{item['query_id']}' not in corpus!"
+
+    unsupported_queries = [q for q in queries if not q.get("is_supported", True) or q.get("category") == "unsupported"]
+    assert len(unsupported_queries) == 3
+    for item in unsupported_queries:
+        assert "query_id" in item
+        assert "query" in item
+        assert len(item["relevant_doc_ids"]) == 0

@@ -103,5 +103,32 @@
     "relevant_doc_ids": ["doc_015"],
     "category": "devops",
     "description": "Tests shared host kernel, Linux namespaces, and cgroups."
+  },
+  {
+    "query_id": "q_016",
+    "query": "What is the current market share of Yotta in the Indian cloud computing market?",
+    "relevant_doc_ids": [],
+    "category": "unsupported",
+    "is_supported": false,
+    "error_type": "no_relevant_passage_retrieved",
+    "description": "Negative test query: Tests pipeline abstention when question topic is completely absent from corpus (Error mode: No relevant passage retrieved / Retry does not help)."
+  },
+  {
+    "query_id": "q_017",
+    "query": "What are the primary symptoms and diagnostic biomarkers of Parkinson's disease?",
+    "relevant_doc_ids": [],
+    "category": "unsupported",
+    "is_supported": false,
+    "error_type": "out_of_domain_abstention",
+    "description": "Negative test query: Medical domain query to verify zero-evidence detection, retry exhaustion, and strict abstention without hallucinations."
+  },
+  {
+    "query_id": "q_018",
+    "query": "Who won the FIFA World Cup final in 2022 and what was the final score?",
+    "relevant_doc_ids": [],
+    "category": "unsupported",
+    "is_supported": false,
+    "error_type": "zero_grounding_rejection",
+    "description": "Negative test query: Sports domain query to verify that non-corpus queries are rejected by threshold grading without hallucinated answers."
   }
 ]

@@ -513,6 +513,20 @@ def main():
             """
         )
 
+        st.markdown("#### 🛡️ Failure Analysis & Error Mitigation Matrix")
+        st.markdown(
+            """
+            | Failure Mode | Root Cause | Pipeline Mitigation & Error Handling |
+            |---|---|---|
+            | **Dataset download fails** | Network, dataset revision or library issue | Use local JSONL fallback; pin dataset revision and document subset selection. |
+            | **No relevant passage retrieved** | Weak chunking, embedding mismatch, poor query or small corpus | Tune chunk size/overlap, compare BM25/dense, improve query rewrite and test data. |
+            | **False relevance grade** | Threshold poorly calibrated or grader prompt weak | Calibrate on labelled examples; inspect false positives/negatives. |
+            | **Hallucinated answer** | Prompt not strict or context does not support claim | Require citations, abstention and claim-level faithfulness review. |
+            | **Provider unavailable** | Missing key, wrong base URL, timeout or model not deployed | Validate config at startup, use timeouts and display actionable errors. |
+            | **Retry does not help** | Rewrite changes meaning or retrieves same passages | Log both queries/results, cap retries and report the limitation. |
+            """
+        )
+
         st.info("💡 **Reproducibility Note:** Embeddings run entirely on CPU without external API dependencies. All verification tests pass offline and deterministically.")
 
 

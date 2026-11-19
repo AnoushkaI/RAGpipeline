@@ -236,38 +236,57 @@ Contains 20 verified technical passages covering diverse computer science domain
 - Zero-Shot Learning via Semantic Embedding Spaces (`doc_020`)
 
 ### 2. Labelled Test Set (`data/eval_queries.json`)
-Contains 15 structured evaluation queries mapped to ground-truth parent document IDs:
+Contains 18 structured evaluation queries: **15 supported technical queries** mapped to ground-truth parent document IDs, and **3 negative out-of-domain error test queries** designed to verify system error handling, zero-evidence detection, and graceful abstention:
 ```json
+// Supported Benchmark Query Example
 {
   "query_id": "q_001",
   "query": "What is the difference between supervised and unsupervised learning?",
   "relevant_doc_ids": ["doc_001"],
   "category": "machine_learning"
 }
+
+// Negative / Error Verification Query Example (Topic Absent from Corpus)
+{
+  "query_id": "q_016",
+  "query": "What is the current market share of Yotta in the Indian cloud computing market?",
+  "relevant_doc_ids": [],
+  "category": "unsupported",
+  "is_supported": false,
+  "error_type": "no_relevant_passage_retrieved",
+  "description": "Negative test query: Tests pipeline abstention when question topic is completely absent from corpus."
+}
 ```
+
+The 3 negative / out-of-domain evaluation queries are:
+1. `q_016`: *"What is the current market share of Yotta in the Indian cloud computing market?"* (Cloud business topic absent from corpus)
+2. `q_017`: *"What are the primary symptoms and diagnostic biomarkers of Parkinson's disease?"* (Medical clinical domain absent from corpus)
+3. `q_018`: *"Who won the FIFA World Cup final in 2022 and what was the final score?"* (Sports history absent from corpus)
 
 ### 3. Retrieval Evaluation Benchmark Results (`results/evaluation_results.csv`)
 
 | Metric | Dense Retrieval (Cosine) | BM25 Retrieval (Okapi) | Winner / Analysis |
 |---|:---:|:---:|---|
 | **Mean Recall@1** | **100.00%** | **86.67%** | Dense captures semantic intent; BM25 missed 2 queries with lexical mismatch |
-| **Mean Recall@3** | **100.00%** | **100.00%** | Both achieve complete recall at top-3 |
-| **Mean Recall@5** | **100.00%** | **100.00%** | Both maintain complete recall at top-5 |
+| **Mean Recall@3** | **100.00%** | **100.00%** | Both achieve complete recall at top-3 across all supported queries |
+| **Mean Recall@5** | **100.00%** | **100.00%** | Both maintain complete recall at top-5 across all supported queries |
 
-The complete query-by-query breakdown is exported to `results/evaluation_results.csv`.
+The complete query-by-query breakdown across all 18 queries is exported to `results/evaluation_results.csv`.
 
 ---
 
-## 7. Failure Analysis & Edge Case Mitigation
+## 7. Failure Analysis & Error Mitigation Matrix
 
-| Failure Mode | Root Cause | Observable Behavior | Pipeline Mitigation |
-|---|---|---|---|
-| **Out-of-Domain Query** | User asks question not covered by corpus (e.g. *"What is the current market share of Yotta in India?"*) | Retrievers return closest top-K chunks despite low relevance | Relevance grader rejects all candidates ($< 0.50$); triggers 1 query rewrite; retried candidates fail grading; system **abstains cleanly** without fabricating facts |
-| **Split Concept Across Chunks** | Fixed chunk boundary splits definitions across continuation chunks | Sibling chunk lacks query keywords and gets score $< 0.50$ | **Two-Pass Continuation Grading:** Primary chunk meeting $\ge 0.50$ unlocks sibling chunk meeting continuation threshold ($\ge 0.35$), providing complete context |
-| **BM25 Lexical Mismatch** | Query uses synonyms or conceptual queries not verbatim in text | BM25 score is 0.0 or near zero | **Hybrid Retrieval (RRF):** Fuses dense vector similarity with lexical rankings so semantic matches rank at top even with zero lexical overlap |
-| **BM25 Raw Score Inflation** | Raw BM25 scores can exceed 10.0, falsely passing cosine thresholds | Low term-overlap chunk passes threshold due to high raw score | **Content-Term Normalization:** `compute_bm25_relevance()` normalizes scores by non-stopword query term coverage into $[0.0, 1.0]$ |
-| **LLM Hallucinated Citations** | Generative model invents citation IDs not in supplied context | Citations include nonexistent document IDs | **Regex Context Validation:** Generator validates all `[doc_id]` citations against active context passages; hallucinated IDs are stripped |
-| **API Provider Timeout / Network Failure** | Remote LLM gateway drops connection or reaches rate limit | Application hangs or crashes | **Defensive Fallback & Health Checks:** Unreachable provider triggers clean fallback to deterministic verification mock; diagnostics report provider status |
+The table below outlines the core failure modes, root causes, and production mitigations implemented across the pipeline:
+
+| Failure Mode | Root Cause | Pipeline Mitigation & Error Handling |
+|---|---|---|
+| **Dataset download fails** | Network failure, Hugging Face dataset revision deprecation, or library issue | **Local JSONL fallback:** When remote loading fails or times out, the system automatically switches to `data/sample_passages.jsonl` with deterministic first-N selection. |
+| **No relevant passage retrieved** | Weak chunking, embedding dimension mismatch, poor query formulation, or small corpus | **Hybrid Retrieval + Bounded Rewrite:** Fuses dense semantic search and BM25Okapi rankings via RRF; triggers an automated LLM query reformulation when initial evidence is missing. |
+| **False relevance grade** | Threshold poorly calibrated or grader prompt weak | **Calibrated Two-Pass Grading:** Pass 1 anchor threshold ($\ge 0.50$) unlocks sibling continuation chunks ($\ge 0.35$); BM25 scores normalized by non-stopword query term coverage. |
+| **Hallucinated answer** | Prompt not strict or context does not support factual claim | **Strict Grounding & Citation Validation:** Prompt directs model to answer *only* from context; regex extractor cross-references bracketed `[doc_id]` citations against supplied passages and strips invalid IDs. |
+| **Provider unavailable** | Missing API key, incorrect base URL, timeout, or model not deployed | **Startup Health Checks & Graceful Fallbacks:** Validates credentials and endpoint status via `health_check()`; provides automatic fallback to deterministic verification mock for offline environments. |
+| **Retry does not help** | Rewrite changes semantic meaning or retrieves the same irrelevant passages | **Strictly Bounded Retry (Max 1):** Limits retries to exactly 1 query reformulation; logs both original and rewritten queries; immediately **abstains cleanly** if evidence remains insufficient. |
 
 ---
 
