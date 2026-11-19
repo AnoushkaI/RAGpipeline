@@ -23,11 +23,16 @@
 
 ### 1. Ingestion & Preprocessing Architecture (`rag/ingestion.py`)
 - [x] **Passage Data Structure:** Implemented `Passage` dataclass holding `doc_id`, normalized `text`, and rich `metadata`.
+- [x] **MS MARCO Dataset Specification:**
+  - **Dataset ID:** `ms_marco`
+  - **Config:** `v1.1`
+  - **Split:** `train`
+  - **Selection Method:** Deterministic sequential first-$N$ slice (`train[:sample_size * 2]`). Avoids pseudo-random sampling variance to guarantee reproducibility.
+  - **Live Verification Status:** Configured adapter with error handling. Live Hugging Face download is unverified in this sandboxed environment; automatically engages the verified local fallback.
 - [x] **Text Cleaning & Sanitization:** Implemented `clean_passage_text()` featuring NFKC unicode normalization, non-printable control character removal, whitespace collapsing, and newline standardization.
 - [x] **Deterministic Content Hashing & Deduplication:** Implemented `compute_content_hash()` using SHA-256 to detect and eliminate duplicate text passages.
-- [x] **Quality Filtering & Schema Validation:** Implemented `clean_and_validate_passages()` enforcing minimum length threshold (`min_length=20`), auto-assigning unique stable IDs when missing, and recording character/word counts into metadata.
-- [x] **Curated Local Fallback Corpus (`data/sample_passages.jsonl`):** Created 20 high-quality factual passages across machine learning, system architecture, database indexing, networking, and RAG theory to guarantee 100% offline reproducibility.
-- [x] **MS MARCO Subset Ingestion (`load_msmarco_subset`):** Added deterministic subset extraction from Hugging Face Datasets with automatic resilient fallback to local JSONL whenever remote access is constrained.
+- [x] **Quality Filtering & Yield Distinction:** Implemented `clean_and_validate_passages()` enforcing minimum length (`min_length=20`), auto-assigning unique stable IDs, and tracking `char_count` / `word_count`. The actual retained passage count is variable ($\le \text{sample\_size}$) based on duplicate and quality filter yields.
+- [x] **Curated Local Fallback Corpus (`data/sample_passages.jsonl`):** 20 high-quality factual passages across machine learning, system architecture, database indexing, networking, and RAG theory for 100% offline reproducibility. Verified and active.
 
 ### 2. Chunking Strategies (`rag/chunking.py`)
 - [x] **Strict Lineage & Parent ID Preservation:** Defined `Chunk` model preserving parent `doc_id`, `chunk_index`, `strategy`, and inherited metadata. Formats chunk IDs deterministically: `f"{doc_id}_f{idx}"` (fixed) and `f"{doc_id}_s{idx}"` (sentence).

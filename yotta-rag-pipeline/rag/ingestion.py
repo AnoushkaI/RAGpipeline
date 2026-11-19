@@ -201,26 +201,40 @@ def load_local_fallback(
 def load_msmarco_subset(
     sample_size: int = 100,
     split: str = "train",
-    seed: int = 42,
     fallback_on_error: bool = True,
 ) -> list[Passage]:
     """
     Loads a reproducible small subset of MS MARCO from Hugging Face Datasets.
     
-    If network access, dataset revision, or environment prevents downloading,
-    it automatically falls back to `load_local_fallback()`.
+    Dataset Details:
+        Dataset ID: 'ms_marco'
+        Config: 'v1.1'
+        Split: 'train' (or user specified)
+    
+    Selection Method:
+        Deterministic sequential first-N slice (e.g. f"{split}[:{sample_size * 2}]").
+        Uses sequential slicing rather than random sampling for exact determinism.
+        
+    Yield & Retained Count:
+        Because raw passages undergo quality filtering (min_length >= 20) and
+        SHA-256 deduplication, the actual retained count is variable and will be
+        <= requested sample_size.
+        
+    Live Verification Status:
+        Configured with resilient local fallback. Live Hugging Face download requires
+        network access and the 'datasets' package; if either is unavailable, the
+        pipeline automatically falls back to `load_local_fallback()`.
     
     Args:
-        sample_size: Number of passages to extract (default: 100).
-        split: Hugging Face dataset split (e.g., 'train').
-        seed: Random seed for deterministic subset selection.
+        sample_size: Maximum target passages to retain (default: 100).
+        split: Hugging Face dataset split (default: 'train').
         fallback_on_error: If True, falls back to local JSONL when HF fails.
     """
-    logger.info(f"Attempting to load MS MARCO subset (size={sample_size}, split={split})...")
+    logger.info(f"Attempting to load MS MARCO subset (requested_size={sample_size}, split={split})...")
     try:
         from datasets import load_dataset
 
-        # Load small slice deterministically
+        # Load small slice deterministically via sequential first-N slice
         dataset = load_dataset(
             "ms_marco",
             "v1.1",
@@ -246,13 +260,15 @@ def load_msmarco_subset(
                         "query_type": row.get("query_type", "unknown"),
                     },
                 })
-                if len(raw_items) >= sample_size:
+                if len(raw_items) >= (sample_size * 2):
                     break
-            if len(raw_items) >= sample_size:
+            if len(raw_items) >= (sample_size * 2):
                 break
 
         passages = clean_and_validate_passages(raw_items, min_length=20, deduplicate=True)
-        return passages[:sample_size]
+        retained = passages[:sample_size]
+        logger.info(f"MS MARCO ingestion yield: requested={sample_size}, retained={len(retained)}")
+        return retained
 
     except Exception as e:
         logger.warning(
@@ -260,7 +276,8 @@ def load_msmarco_subset(
             "Falling back to local curated JSONL dataset."
         )
         if fallback_on_error:
-            return load_local_fallback()
+            fallback_passages = load_local_fallback()
+            return fallback_passages[:sample_size]
         raise
 
 
@@ -275,9 +292,11 @@ def load_corpus(
     Args:
         use_hf: If True, attempts Hugging Face MS MARCO with fallback.
                 If False, directly loads curated local fallback dataset.
-        sample_size: Maximum passages to load.
+        sample_size: Maximum target passages to retain (retained count may be <= sample_size
+                     due to quality filtering and deduplication).
         local_path: Custom local JSONL file path if specified.
     """
     if use_hf:
         return load_msmarco_subset(sample_size=sample_size, fallback_on_error=True)
-    return load_local_fallback(filepath=local_path)
+    passages = load_local_fallback(filepath=local_path)
+    return passages[:sample_size]

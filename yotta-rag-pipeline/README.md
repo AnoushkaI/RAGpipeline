@@ -174,7 +174,33 @@ streamlit run app.py
 
 ---
 
-## 5. Security & Reliability Highlights
+## 5. Dataset Ingestion, Cleaning & Fallback
+
+### Dataset Specification & Selection Method
+* **Dataset ID:** `ms_marco`
+* **Configuration:** `v1.1`
+* **Split:** `train`
+* **Selection Method:** Deterministic sequential first-$N$ slice (e.g., `train[:sample_size * 2]`). Sequential slicing is deliberately chosen over pseudo-random sampling to guarantee exact cross-environment reproducibility without seed drift.
+* **Requested Subset Size:** Configurable via `sample_size` parameter (default: 100 passages).
+
+### Cleaning & Deduplication Pipeline
+1. **Unicode Normalization:** Applies NFKC normalization to standardize curly quotes, hyphens, and accents.
+2. **Control Character Stripping:** Removes non-printable characters while preserving valid spaces, tabs, and newlines.
+3. **Whitespace Compaction:** Collapses runs of consecutive spaces/tabs into a single space and caps excessive newlines at two.
+4. **Quality Threshold:** Discards fragments and empty strings shorter than `min_length=20` characters.
+5. **Deduplication:** Computes a SHA-256 hash of normalized lowercase text; duplicate content hashes are discarded.
+
+> [!IMPORTANT]
+> **Requested vs. Retained Passage Count:**  
+> The number of raw passages requested (`sample_size`) is an upper target. Because the ingestion pipeline strictly filters low-quality stubs and eliminates duplicate passages, the **actual retained count is variable and will be $\le \text{sample\_size}$**. The pipeline does not claim a fixed final count.
+
+### Local JSONL Fallback & Live Verification Status
+* **Curated Local Fallback (`data/sample_passages.jsonl`):** Contains 20 curated, high-information passages spanning Machine Learning, Information Retrieval, Database Indexing, and Networking. **Verified and fully operational offline.**
+* **Hugging Face Ingestion Status:** The Hugging Face loading adapter is fully configured and handles errors gracefully. However, live network ingestion from Hugging Face has **not yet been verified in the sandboxed environment** (where external network access is blocked). When Hugging Face is unreachable or the `datasets` package is absent, the system automatically falls back to the verified local JSONL corpus.
+
+---
+
+## 6. Security & Reliability Highlights
 1. **No Secret Leaks:** All API keys are masked using `mask_secret()` before logging or rendering on the Streamlit dashboard.
 2. **Graceful Degradation:** Missing credentials or unreachable server ports do not crash the application. Friendly diagnostics (`MISSING_CREDENTIALS` / `FAILED`) advise the user on next steps.
 3. **No Heavy Framework Bloat:** Implemented directly with clean, readable Python, NumPy, and standard library constructs rather than complex agent frameworks or external vector databases.

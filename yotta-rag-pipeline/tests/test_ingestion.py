@@ -69,8 +69,18 @@ def test_load_local_fallback():
     assert "doc_006" in doc_ids  # BM25
 
 
-def test_msmarco_fallback_on_error():
+def test_msmarco_fallback_on_error(monkeypatch):
     """Verify load_msmarco_subset falls back cleanly to local fallback when HF dataset is unavailable."""
+    # Simulate network failure immediately to test fallback without socket timeout delay
+    def fake_load_dataset(*args, **kwargs):
+        raise ConnectionError("Simulated network timeout")
+
+    try:
+        import datasets
+        monkeypatch.setattr(datasets, "load_dataset", fake_load_dataset)
+    except ImportError:
+        pass
+
     passages = load_msmarco_subset(sample_size=10, fallback_on_error=True)
     assert len(passages) >= 10
     assert all(isinstance(p, Passage) for p in passages)
