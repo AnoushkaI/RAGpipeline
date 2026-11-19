@@ -1,0 +1,107 @@
+[
+  {
+    "query_id": "q_001",
+    "query": "What is the difference between supervised and unsupervised learning?",
+    "relevant_doc_ids": ["doc_001"],
+    "category": "machine_learning",
+    "description": "Tests distinction between labeled training data and discovery of unlabeled distributions."
+  },
+  {
+    "query_id": "q_002",
+    "query": "How can machine learning models prevent overfitting on training data?",
+    "relevant_doc_ids": ["doc_002"],
+    "category": "machine_learning",
+    "description": "Tests regularization techniques like L1, L2, Dropout, and data augmentation."
+  },
+  {
+    "query_id": "q_003",
+    "query": "What role does the learning rate play in gradient descent optimization?",
+    "relevant_doc_ids": ["doc_003"],
+    "category": "optimization",
+    "description": "Tests understanding of step size, divergence, and convergence rates."
+  },
+  {
+    "query_id": "q_004",
+    "query": "How does self-attention work in Transformer models?",
+    "relevant_doc_ids": ["doc_004"],
+    "category": "deep_learning",
+    "description": "Tests queries, keys, values, and scaled dot-product attention."
+  },
+  {
+    "query_id": "q_005",
+    "query": "Why is retrieval-augmented generation used to reduce hallucinations in LLMs?",
+    "relevant_doc_ids": ["doc_005"],
+    "category": "rag",
+    "description": "Tests understanding of external evidence retrieval and source citation."
+  },
+  {
+    "query_id": "q_006",
+    "query": "How does the BM25 lexical ranking algorithm improve over standard TF-IDF?",
+    "relevant_doc_ids": ["doc_006"],
+    "category": "information_retrieval",
+    "description": "Tests term frequency saturation parameter k1 and length penalty b."
+  },
+  {
+    "query_id": "q_007",
+    "query": "What are the advantages of dense vector retrieval over keyword search?",
+    "relevant_doc_ids": ["doc_007"],
+    "category": "information_retrieval",
+    "description": "Tests semantic similarity, embedding spaces, and overcoming vocabulary mismatch."
+  },
+  {
+    "query_id": "q_008",
+    "query": "Why are B-Trees preferred for database indexing and disk storage?",
+    "relevant_doc_ids": ["doc_008"],
+    "category": "databases",
+    "description": "Tests self-balancing tree depth and block memory I/O optimization."
+  },
+  {
+    "query_id": "q_009",
+    "query": "How does the Python Global Interpreter Lock affect multithreaded CPU tasks?",
+    "relevant_doc_ids": ["doc_009"],
+    "category": "programming",
+    "description": "Tests CPython mutex behavior and need for multiprocessing."
+  },
+  {
+    "query_id": "q_010",
+    "query": "What happens during a TLS handshake to secure internet traffic?",
+    "relevant_doc_ids": ["doc_010"],
+    "category": "security",
+    "description": "Tests cipher negotiation, certificates, and Diffie-Hellman key exchange."
+  },
+  {
+    "query_id": "q_011",
+    "query": "What is the difference between IaaS, PaaS, and SaaS in cloud computing?",
+    "relevant_doc_ids": ["doc_011"],
+    "category": "cloud",
+    "description": "Tests cloud infrastructure, platform, and application service levels."
+  },
+  {
+    "query_id": "q_012",
+    "query": "How do quantum qubits differ from classical computer bits?",
+    "relevant_doc_ids": ["doc_012"],
+    "category": "quantum",
+    "description": "Tests quantum superposition allowing simultaneous state evaluation."
+  },
+  {
+    "query_id": "q_013",
+    "query": "How is k-fold cross-validation performed to evaluate model accuracy?",
+    "relevant_doc_ids": ["doc_013"],
+    "category": "machine_learning",
+    "description": "Tests splitting data into k folds to produce unbiased performance estimates."
+  },
+  {
+    "query_id": "q_014",
+    "query": "What is the goal of relational database normalization?",
+    "relevant_doc_ids": ["doc_014"],
+    "category": "databases",
+    "description": "Tests normal forms, elimination of redundancy, and update anomalies."
+  },
+  {
+    "query_id": "q_015",
+    "query": "How does Docker containerization provide lightweight isolation compared to virtual machines?",
+    "relevant_doc_ids": ["doc_015"],
+    "category": "devops",
+    "description": "Tests shared host kernel, Linux namespaces, and cgroups."
+  }
+]

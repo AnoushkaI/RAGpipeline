@@ -39,11 +39,12 @@ User Answer + Source Citations + Quality & Latency Metrics
 
 | Requirement / Scope Item | Category | Status | Notes |
 |---|---|---|---|
-| **Reproducible MS MARCO subset** | Ingestion | Pending (Phase 2) | Hugging Face MS MARCO small subset |
-| **Local JSONL fallback** | Ingestion | Pending (Phase 2) | Offline resilient corpus |
-| **Passage cleaning & stable IDs** | Preprocessing | Pending (Phase 2) | Whitespace, deduplication, metadata |
-| **Fixed-size chunking with overlap** | Chunking | Pending (Phase 2) | Configurable chunk_size & chunk_overlap |
-| **Sentence-boundary chunking** | Chunking | Pending (Phase 2) | Alternative structural chunking |
+| **Reproducible MS MARCO subset** | Ingestion | **Implemented (Phase 2)** | Hugging Face MS MARCO with deterministic slicing & auto-fallback |
+| **Local JSONL fallback** | Ingestion | **Implemented (Phase 2)** | 20 curated technical passages in `data/sample_passages.jsonl` |
+| **Passage cleaning & stable IDs** | Preprocessing | **Implemented (Phase 2)** | Unicode NFKC, control char removal, SHA-256 deduplication, stable `doc_id` |
+| **Fixed-size chunking with overlap** | Chunking | **Implemented (Phase 2)** | Configurable `chunk_size` & `chunk_overlap` with word boundary snapping |
+| **Sentence-boundary chunking** | Chunking | **Implemented (Phase 2)** | Alternative structural strategy grouping complete grammatical sentences |
+| **Labelled evaluation queries** | Evaluation | **Implemented (Phase 2)** | 15 test queries in `data/eval_queries.json` mapped to relevant `doc_id`s |
 | **Dense vector retrieval** | Retrieval | Pending (Phase 3) | Cosine similarity via NumPy in-memory matrix |
 | **BM25 lexical retrieval** | Retrieval | Pending (Phase 3) | `rank-bm25` baseline |
 | **Recall@K evaluation metric** | Evaluation | Pending (Phase 3/5) | Labelled queries vs ground-truth passage IDs |
