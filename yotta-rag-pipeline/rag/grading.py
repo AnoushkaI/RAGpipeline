@@ -178,45 +178,124 @@ class RelevanceGrader:
         rejected: list[RetrievalResult] = []
         decisions: list[GradingDecision] = []
 
-        # Find max score in candidates for relative scaling when appropriate
-        max_score = max((c.score for c in candidates), default=0.0)
+        continuation_threshold = max(0.25, round(self.threshold * 0.70, 4))
+
+        # Pass 1: Identify primary anchor chunks that meet the standard threshold independently
+        anchor_doc_ids: set[str] = set()
+        prelim_evals = []
 
         for cand in candidates:
             strat = cand.strategy.lower()
+            dense_score = 0.0
+            norm_bm25 = 0.0
+            cov = 0.0
+            bm_reason = ""
+            is_primary = False
+
+            if strat == "dense":
+                dense_score = float(cand.score)
+                is_primary = dense_score >= self.threshold
+            elif strat == "bm25":
+                norm_bm25, cov, bm_reason = compute_bm25_relevance(query, cand.text, cand.score)
+                is_primary = norm_bm25 >= self.threshold
+            elif strat == "hybrid":
+                dense_score = float(cand.metadata.get("dense_score", cand.score))
+                b_score = float(cand.metadata.get("bm25_score", 0.0))
+                norm_bm25, cov, bm_reason = compute_bm25_relevance(query, cand.text, b_score)
+                dense_pass = dense_score >= self.threshold
+                bm25_pass = norm_bm25 >= self.threshold
+                is_primary = dense_pass or bm25_pass
+            else:
+                is_primary = cand.score >= self.threshold
+
+            if is_primary:
+                anchor_doc_ids.add(cand.doc_id)
+
+            prelim_evals.append({
+                "cand": cand,
+                "strat": strat,
+                "dense_score": dense_score,
+                "norm_bm25": norm_bm25,
+                "cov": cov,
+                "bm_reason": bm_reason,
+                "is_primary": is_primary,
+            })
+
+        # Pass 2: Final grading decisions with parent-document continuation chunk logic
+        for eval_item in prelim_evals:
+            cand = eval_item["cand"]
+            strat = eval_item["strat"]
+            dense_score = eval_item["dense_score"]
+            norm_bm25 = eval_item["norm_bm25"]
+            cov = eval_item["cov"]
+            bm_reason = eval_item["bm_reason"]
+            is_primary = eval_item["is_primary"]
+
             is_rel = False
             reason = ""
 
-            if strat == "dense":
-                # Cosine similarity in [-1.0, 1.0]
-                is_rel = cand.score >= self.threshold
-                status_str = ">=" if is_rel else "<"
-                reason = f"Dense cosine score {cand.score:.4f} {status_str} threshold {self.threshold:.4f}"
-
-            elif strat == "bm25":
-                # Normalize BM25 score with query term coverage to avoid direct raw-score comparison
-                norm_bm25, cov, bm_reason = compute_bm25_relevance(query, cand.text, cand.score)
-                is_rel = norm_bm25 >= self.threshold
-                status_str = ">=" if is_rel else "<"
-                reason = f"{bm_reason} {status_str} threshold {self.threshold:.4f}"
-
-            elif strat == "hybrid":
-                # Evaluates both underlying dense similarity and lexical coverage
-                d_score = float(cand.metadata.get("dense_score", cand.score))
-                b_score = float(cand.metadata.get("bm25_score", 0.0))
-                norm_bm25, cov, bm_reason = compute_bm25_relevance(query, cand.text, b_score)
-                dense_pass = d_score >= self.threshold
-                bm25_pass = norm_bm25 >= self.threshold
-                is_rel = dense_pass or bm25_pass
-                status_str = ">=" if is_rel else "<"
-                reason = (
-                    f"Hybrid candidate (dense={d_score:.4f}, bm25_norm={norm_bm25:.4f} [cov={cov:.2f}]) "
-                    f"{status_str} threshold {self.threshold:.4f}"
-                )
-
+            if is_primary:
+                is_rel = True
+                if strat == "dense":
+                    reason = f"Dense cosine score {dense_score:.4f} >= threshold {self.threshold:.4f} (primary anchor)"
+                elif strat == "bm25":
+                    reason = f"{bm_reason} >= threshold {self.threshold:.4f} (primary anchor)"
+                elif strat == "hybrid":
+                    reason = (
+                        f"Hybrid primary candidate (dense={dense_score:.4f}, bm25_norm={norm_bm25:.4f} [cov={cov:.2f}]) "
+                        f">= threshold {self.threshold:.4f}"
+                    )
+                else:
+                    reason = f"Score {cand.score:.4f} >= threshold {self.threshold:.4f} (primary anchor)"
             else:
-                # Default fallback comparison
-                is_rel = cand.score >= self.threshold
-                reason = f"Score {cand.score:.4f} vs threshold {self.threshold:.4f}"
+                # Check for continuation / complementary evidence from an already anchored document
+                is_continuation = cand.doc_id in anchor_doc_ids
+                if is_continuation:
+                    if strat == "dense":
+                        is_rel = dense_score >= continuation_threshold
+                        status_str = ">=" if is_rel else "<"
+                        reason = (
+                            f"Continuation chunk for anchor document [{cand.doc_id}]: Dense cosine score {dense_score:.4f} "
+                            f"{status_str} continuation threshold {continuation_threshold:.4f}"
+                        )
+                    elif strat == "bm25":
+                        # In BM25, accept continuation if normalized score reaches continuation threshold or has positive lexical signal
+                        is_rel = norm_bm25 >= continuation_threshold or (cand.score > 0.0 and cov >= 0.15)
+                        status_str = ">=" if is_rel else "<"
+                        reason = (
+                            f"Continuation chunk for anchor document [{cand.doc_id}]: {bm_reason} "
+                            f"{status_str} continuation threshold {continuation_threshold:.4f}"
+                        )
+                    elif strat == "hybrid":
+                        dense_cont = dense_score >= continuation_threshold
+                        bm25_cont = norm_bm25 >= continuation_threshold
+                        is_rel = dense_cont or bm25_cont
+                        status_str = ">=" if is_rel else "<"
+                        reason = (
+                            f"Continuation chunk for anchor document [{cand.doc_id}]: Hybrid candidate "
+                            f"(dense={dense_score:.4f}, bm25_norm={norm_bm25:.4f}) {status_str} "
+                            f"continuation threshold {continuation_threshold:.4f}"
+                        )
+                    else:
+                        is_rel = cand.score >= continuation_threshold
+                        status_str = ">=" if is_rel else "<"
+                        reason = (
+                            f"Continuation chunk for anchor document [{cand.doc_id}]: score {cand.score:.4f} "
+                            f"{status_str} continuation threshold {continuation_threshold:.4f}"
+                        )
+                else:
+                    # Sibling without anchor, or completely unrelated document
+                    if strat == "dense":
+                        reason = f"Dense cosine score {dense_score:.4f} < threshold {self.threshold:.4f}"
+                    elif strat == "bm25":
+                        reason = f"{bm_reason} < threshold {self.threshold:.4f}"
+                    elif strat == "hybrid":
+                        reason = (
+                            f"Hybrid candidate (dense={dense_score:.4f}, bm25_norm={norm_bm25:.4f} [cov={cov:.2f}]) "
+                            f"< threshold {self.threshold:.4f}"
+                        )
+                    else:
+                        reason = f"Score {cand.score:.4f} < threshold {self.threshold:.4f}"
 
             decision = GradingDecision(
                 chunk_id=cand.chunk_id,

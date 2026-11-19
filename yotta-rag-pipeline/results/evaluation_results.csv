@@ -1,0 +1,16 @@
+query_id,query,category,relevant_doc_ids,dense_recall@1,bm25_recall@1,dense_recall@3,bm25_recall@3,dense_recall@5,bm25_recall@5
+q_001,What is the difference between supervised and unsupervised learning?,machine_learning,doc_001,1.0,1.0,1.0,1.0,1.0,1.0
+q_002,How can machine learning models prevent overfitting on training data?,machine_learning,doc_002,1.0,0.0,1.0,1.0,1.0,1.0
+q_003,What role does the learning rate play in gradient descent optimization?,optimization,doc_003,1.0,1.0,1.0,1.0,1.0,1.0
+q_004,How does self-attention work in Transformer models?,deep_learning,doc_004,1.0,1.0,1.0,1.0,1.0,1.0
+q_005,Why is retrieval-augmented generation used to reduce hallucinations in LLMs?,rag,doc_005,1.0,1.0,1.0,1.0,1.0,1.0
+q_006,How does the BM25 lexical ranking algorithm improve over standard TF-IDF?,information_retrieval,doc_006,1.0,1.0,1.0,1.0,1.0,1.0
+q_007,What are the advantages of dense vector retrieval over keyword search?,information_retrieval,doc_007,1.0,0.0,1.0,1.0,1.0,1.0
+q_008,Why are B-Trees preferred for database indexing and disk storage?,databases,doc_008,1.0,1.0,1.0,1.0,1.0,1.0
+q_009,How does the Python Global Interpreter Lock affect multithreaded CPU tasks?,programming,doc_009,1.0,1.0,1.0,1.0,1.0,1.0
+q_010,What happens during a TLS handshake to secure internet traffic?,security,doc_010,1.0,1.0,1.0,1.0,1.0,1.0
+q_011,"What is the difference between IaaS, PaaS, and SaaS in cloud computing?",cloud,doc_011,1.0,1.0,1.0,1.0,1.0,1.0
+q_012,How do quantum qubits differ from classical computer bits?,quantum,doc_012,1.0,1.0,1.0,1.0,1.0,1.0
+q_013,How is k-fold cross-validation performed to evaluate model accuracy?,machine_learning,doc_013,1.0,1.0,1.0,1.0,1.0,1.0
+q_014,What is the goal of relational database normalization?,databases,doc_014,1.0,1.0,1.0,1.0,1.0,1.0
+q_015,How does Docker containerization provide lightweight isolation compared to virtual machines?,devops,doc_015,1.0,1.0,1.0,1.0,1.0,1.0

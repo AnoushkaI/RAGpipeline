@@ -105,6 +105,38 @@ def test_evaluate_retrievers_mock_benchmark():
     assert "RETRIEVAL EVALUATION REPORT" in summary_table
 
 
+def test_evaluation_report_export_csv(tmp_path):
+    """Verify that EvaluationReport.export_csv writes valid CSV output."""
+    chunks = [
+        Chunk("doc_001_f0", "doc_001", "Backpropagation computes gradients.", 0, "fixed"),
+    ]
+    mock_provider = MockEmbeddingProvider(dimension=4)
+    dense_idx = build_dense_index(chunks, mock_provider)
+    bm25_idx = build_bm25_index(chunks)
+
+    dense_retriever = DenseRetriever(dense_idx, mock_provider)
+    bm25_retriever = BM25Retriever(bm25_idx)
+
+    mock_queries = [
+        {"query_id": "q1", "query": "gradients", "relevant_doc_ids": ["doc_001"], "category": "ml"},
+    ]
+
+    report = evaluate_retrievers(
+        queries=mock_queries,
+        dense_retriever=dense_retriever,
+        bm25_retriever=bm25_retriever,
+        k_values=[1, 3],
+    )
+
+    out_file = tmp_path / "results" / "eval.csv"
+    saved_path = report.export_csv(out_file)
+    assert saved_path.exists()
+    content = saved_path.read_text(encoding="utf-8")
+    assert "query_id,query,category,relevant_doc_ids" in content
+    assert "q1,gradients,ml,doc_001" in content
+
+
+
 def test_local_sentence_transformer_integration():
     """
     Integration test running real SentenceTransformer embeddings on CPU

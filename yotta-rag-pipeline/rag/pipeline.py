@@ -234,6 +234,7 @@ class RAGPipeline:
         strategy: Optional[Literal["dense", "bm25", "hybrid"]] = None,
         top_k: Optional[int] = None,
         grading_method: Optional[Literal["threshold", "llm"]] = None,
+        threshold: Optional[float] = None,
     ) -> RAGResponse:
         """
         Execute end-to-end question answering pipeline for a query.
@@ -243,6 +244,7 @@ class RAGPipeline:
             strategy: 'dense', 'bm25', or 'hybrid' (defaults to 'dense').
             top_k: Number of chunks to retrieve (defaults to config.rag.top_k).
             grading_method: Optional override for grading method ('threshold' or 'llm').
+            threshold: Optional override for relevance threshold.
             
         Returns:
             RAGResponse object containing answer, citations, timing, and diagnostics.
@@ -343,10 +345,12 @@ class RAGPipeline:
             )
 
         # 4. Relevance Grading
-        if grading_method and grading_method != self.grader.method:
+        active_threshold = float(threshold) if threshold is not None else self.config.rag.relevance_threshold
+        active_method = (grading_method or self.grader.method).lower().strip()
+        if active_method != self.grader.method or active_threshold != self.grader.threshold:
             active_grader = RelevanceGrader(
-                method=grading_method,
-                threshold=self.config.rag.relevance_threshold,
+                method=active_method,
+                threshold=active_threshold,
                 llm_provider=self.llm_provider,
             )
         else:

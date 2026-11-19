@@ -148,6 +148,54 @@ class EvaluationReport:
         lines.append("==================================================================")
         return "\n".join(lines)
 
+    def to_dataframe(self):
+        """Converts query records to a pandas DataFrame for UI rendering."""
+        import pandas as pd
+        rows = []
+        for q in self.query_records:
+            row = {
+                "Query ID": q.query_id,
+                "Query": q.query,
+                "Category": q.category,
+                "Ground Truth Docs": ", ".join(q.relevant_doc_ids),
+            }
+            for k in self.k_values:
+                row[f"Dense Recall@{k}"] = round(q.dense_recall_at_k.get(k, 0.0), 4)
+                row[f"BM25 Recall@{k}"] = round(q.bm25_recall_at_k.get(k, 0.0), 4)
+            rows.append(row)
+        return pd.DataFrame(rows)
+
+    def export_csv(self, output_path: str | Path = "results/evaluation_results.csv") -> Path:
+        """
+        Exports query evaluation records to a structured CSV file.
+        Creates parent directories automatically if missing.
+        """
+        import csv
+        path = Path(output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        fieldnames = ["query_id", "query", "category", "relevant_doc_ids"]
+        for k in self.k_values:
+            fieldnames.extend([f"dense_recall@{k}", f"bm25_recall@{k}"])
+
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for q in self.query_records:
+                row = {
+                    "query_id": q.query_id,
+                    "query": q.query,
+                    "category": q.category,
+                    "relevant_doc_ids": ";".join(q.relevant_doc_ids),
+                }
+                for k in self.k_values:
+                    row[f"dense_recall@{k}"] = round(q.dense_recall_at_k.get(k, 0.0), 4)
+                    row[f"bm25_recall@{k}"] = round(q.bm25_recall_at_k.get(k, 0.0), 4)
+                writer.writerow(row)
+
+        logger.info(f"Exported evaluation results to: {path}")
+        return path
+
 
 # ------------------------------------------------------------------------------
 # Dataset Loader
@@ -271,6 +319,7 @@ def run_benchmark(
     chunk_strategy: str = "fixed",
     chunk_size: int = 300,
     chunk_overlap: int = 50,
+    export_csv_path: Optional[str | Path] = "results/evaluation_results.csv",
 ) -> EvaluationReport:
     """
     Executes an end-to-end evaluation benchmark over the local corpus using the
@@ -283,7 +332,7 @@ def run_benchmark(
     from rag.providers import get_embedding_provider
 
     print("=" * 66)
-    print("   RUNNING PHASE 3 RETRIEVAL BENCHMARK: DENSE vs. BM25")
+    print("   RUNNING PHASE 3/5 RETRIEVAL BENCHMARK: DENSE vs. BM25")
     print("=" * 66)
 
     config = load_config()
@@ -322,6 +371,11 @@ def run_benchmark(
     )
 
     print("\n" + report.format_summary_table() + "\n")
+
+    if export_csv_path:
+        csv_file = report.export_csv(export_csv_path)
+        print(f"Saved evaluation benchmark CSV to: {csv_file}")
+
     return report
 
 

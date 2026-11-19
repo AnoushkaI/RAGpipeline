@@ -158,6 +158,11 @@ def run_benchmark_verification(pipeline: RAGPipeline) -> None:
         assert res.has_sufficient_context, f"Strategy {strat} should find sufficient context for supported query!"
         assert len(res.passed_chunks) > 0, f"Strategy {strat} should have passed chunks for supported query!"
         assert "doc_001" in [c.doc_id for c in res.passed_chunks], f"Strategy {strat} should retrieve doc_001!"
+        if strat == "dense":
+            passed_cids = [c.chunk_id for c in res.passed_chunks]
+            assert "doc_001_f0" in passed_cids and "doc_001_f1" in passed_cids, (
+                f"Dense retrieval should pass both anchor doc_001_f0 and continuation doc_001_f1! Got: {passed_cids}"
+            )
 
 
 def main() -> None:

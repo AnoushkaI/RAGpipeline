@@ -447,3 +447,128 @@ def test_unsupported_question_rejection_across_strategies(monkeypatch):
         assert "cannot answer" in res.answer.lower()
         assert len(res.cited_doc_ids) == 0
         assert len(res.passed_chunks) == 0
+
+
+def test_grading_continuation_chunk_accepted_for_anchored_doc():
+    """
+    Regression Test:
+    Verify that when doc_001_f0 passes as a primary anchor (score >= 0.50),
+    sibling chunk doc_001_f1 (score = 0.40) is accepted as a valid continuation chunk,
+    while unrelated chunk doc_099_f0 (score = 0.38) is strictly rejected.
+    """
+    grader = RelevanceGrader(method="threshold", threshold=0.50)
+
+    candidates = [
+        RetrievalResult(
+            chunk_id="doc_001_f0",
+            doc_id="doc_001",
+            text="Supervised learning involves training algorithms on labeled datasets...",
+            score=0.8213,
+            strategy="dense",
+        ),
+        RetrievalResult(
+            chunk_id="doc_001_f1",
+            doc_id="doc_001",
+            text="groupings, or distributions without explicit human supervisory signals...",
+            score=0.4004,
+            strategy="dense",
+        ),
+        RetrievalResult(
+            chunk_id="doc_099_f0",
+            doc_id="doc_099",
+            text="Unrelated passage about database query optimization...",
+            score=0.3800,
+            strategy="dense",
+        ),
+    ]
+
+    result = grader.grade(query="What is the difference between supervised and unsupervised learning?", candidates=candidates)
+
+    assert result.is_sufficient is True
+    passed_ids = [c.chunk_id for c in result.passed_chunks]
+    rejected_ids = [c.chunk_id for c in result.rejected_chunks]
+
+    assert "doc_001_f0" in passed_ids, "Anchor chunk doc_001_f0 should pass!"
+    assert "doc_001_f1" in passed_ids, "Continuation chunk doc_001_f1 should pass!"
+    assert "doc_099_f0" in rejected_ids, "Unrelated chunk doc_099_f0 must be rejected!"
+    assert len(result.passed_chunks) == 2
+
+
+def test_grading_unanchored_siblings_all_rejected():
+    """
+    Regression Test:
+    Verify that when NO chunk meets the primary threshold (0.50), sibling chunks
+    from the same document (e.g. doc_011_f0 at 0.37 and doc_011_f1 at 0.31)
+    are BOTH rejected, ensuring no false positives for unsupported queries.
+    """
+    grader = RelevanceGrader(method="threshold", threshold=0.50)
+
+    candidates = [
+        RetrievalResult(
+            chunk_id="doc_011_f0",
+            doc_id="doc_011",
+            text="Cloud computing deployment models include Infrastructure as a Service...",
+            score=0.3713,
+            strategy="dense",
+        ),
+        RetrievalResult(
+            chunk_id="doc_011_f1",
+            doc_id="doc_011",
+            text="times and development frameworks; and SaaS delivers fully managed software...",
+            score=0.3162,
+            strategy="dense",
+        ),
+    ]
+
+    result = grader.grade(query="What is the current market share of Yotta in India?", candidates=candidates)
+
+    assert result.is_sufficient is False
+    assert len(result.passed_chunks) == 0
+    assert len(result.rejected_chunks) == 2
+
+
+def test_grading_mixed_candidates_hybrid_strategy_aware():
+    """
+    Regression Test:
+    Verify strategy-aware hybrid grading correctly evaluates dense and BM25 signals,
+    admitting continuation chunks when anchored and rejecting irrelevant ones.
+    """
+    grader = RelevanceGrader(method="threshold", threshold=0.50)
+
+    candidates = [
+        RetrievalResult(
+            chunk_id="doc_001_f0",
+            doc_id="doc_001",
+            text="Supervised learning involves training algorithms on labeled datasets...",
+            score=1.0000,
+            strategy="hybrid",
+            metadata={"dense_score": 0.8213, "bm25_score": 9.14},
+        ),
+        RetrievalResult(
+            chunk_id="doc_001_f1",
+            doc_id="doc_001",
+            text="groupings, or distributions without explicit human supervisory signals...",
+            score=0.8500,
+            strategy="hybrid",
+            metadata={"dense_score": 0.4004, "bm25_score": 0.0},
+        ),
+        RetrievalResult(
+            chunk_id="doc_013_f0",
+            doc_id="doc_013",
+            text="Cross-validation is a statistical resampling procedure...",
+            score=0.9200,
+            strategy="hybrid",
+            metadata={"dense_score": 0.2666, "bm25_score": 4.23},
+        ),
+    ]
+
+    result = grader.grade(query="What is the difference between supervised and unsupervised learning?", candidates=candidates)
+
+    assert result.is_sufficient is True
+    passed_ids = [c.chunk_id for c in result.passed_chunks]
+    rejected_ids = [c.chunk_id for c in result.rejected_chunks]
+
+    assert "doc_001_f0" in passed_ids
+    assert "doc_001_f1" in passed_ids
+    assert "doc_013_f0" in rejected_ids
+

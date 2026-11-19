@@ -44,6 +44,6 @@ htmlcov/
 Thumbs.db
 desktop.ini
 
-# Output results (preserve data samples, ignore generated evaluation runs)
-results/*.csv
+# Output results (preserve data samples and benchmark artifacts)
+!results/evaluation_results.csv
 !results/.gitkeep
