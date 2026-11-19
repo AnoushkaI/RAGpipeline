@@ -57,7 +57,10 @@
 ## Git & Deployment Status
 - **GitHub Repository:** `https://github.com/AnoushkaI/RAGpipeline`
 - **Active Branch:** `main`
-- **Initial Sync Commit:** `f76dc59` (Phase 1 foundation & provider setup)
+- **Recent Commits:**
+  - `f76dc59` (Phase 1 foundation & provider setup)
+  - `71d91ed` (Phase 2 core: MS MARCO ingestion, cleaning, chunking, eval dataset)
+  - `9e266a2` (Phase 2 docs & reproducibility cleanup: dataset specs, yield distinction, seed removal)
 - **Secrets Protection:** Root `.gitignore` and `yotta-rag-pipeline/.gitignore` actively exclude all `.env` files and credentials.
 
 ---
